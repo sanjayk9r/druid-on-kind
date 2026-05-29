@@ -1,0 +1,11 @@
+Druid cluster "{{ .Values.clusterName }}" has been applied to namespace "{{ .Release.Namespace }}".
+
+This chart deploys a Druid custom resource; the druid-operator must be running to
+reconcile it into pods.
+
+Check rollout:
+  kubectl get druid {{ .Values.clusterName }} -n {{ .Release.Namespace }}
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+Image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+Deep storage bucket: {{ .Values.deepStorage.bucket }} ({{ .Values.deepStorage.s3.endpointUrl }})

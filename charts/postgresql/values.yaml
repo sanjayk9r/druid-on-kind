@@ -1,0 +1,42 @@
+# Default values for the postgresql chart.
+# Single-instance PostgreSQL intended as Druid's metadata store.
+
+# Name used for the Deployment and Service. Druid connects to this Service name
+# (see the Druid metadata connectURI), so keep it "postgres" unless you also
+# update that URI.
+fullnameOverride: postgres
+
+replicas: 1
+
+image:
+  repository: postgres
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+auth:
+  # WARNING: plaintext. For real deployments use a Secret instead.
+  password: "mySuperSecret@1234"
+  # Optional. Leave empty to use the image default superuser ("postgres").
+  username: "druid"
+  # Optional. If set, this database is created on first start (e.g. "druid").
+  database: "druid"
+
+service:
+  type: ClusterIP
+  port: 5432
+
+containerPort: 5432
+
+# Optional pod resource requests/limits, e.g. requests.memory / limits.cpu.
+resources: {}
+
+persistence:
+  # Create and mount a PersistentVolumeClaim for the database data.
+  enabled: true
+  # When true, the PVC is kept on `helm uninstall` (helm.sh/resource-policy: keep)
+  # so data survives a reinstall. Set to false to let the PVC be deleted with the
+  # release: helm upgrade ... --set persistence.retain=false (then uninstall).
+  retain: true
+  size: 1Gi
+  storageClassName: standard
+  accessMode: ReadWriteOnce

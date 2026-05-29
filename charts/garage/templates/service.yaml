@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "garage.name" . }}
+  labels:
+    {{- include "garage.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ include "garage.name" . }}
+  ports:
+    - port: {{ .Values.ports.s3Api }}
+      name: s3-api
+    - port: {{ .Values.ports.s3Web }}
+      name: s3-web
+    - port: {{ .Values.ports.admin }}
+      name: admin

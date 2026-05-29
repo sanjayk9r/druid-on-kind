@@ -1,0 +1,123 @@
+# Default values for the druid chart.
+# This chart renders a Druid custom resource (druid.apache.org/v1alpha1) and its
+# RBAC. It requires the druid-operator to already be installed in the cluster.
+
+# Name of the Druid custom resource (i.e. the cluster).
+clusterName: tiny-cluster
+
+# Override the generated names used for RBAC objects.
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: apache/druid
+  tag: "35.0.0"
+
+# Labels/annotations applied to every Druid pod.
+podLabels:
+  environment: stage
+  release: alpha
+podAnnotations:
+  clusterType: "local-druid"
+
+securityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsGroup: 1000
+
+# Common JVM options shared by all Druid server nodes (NOT the task peons).
+jvm:
+  maxDirectMemorySize: 200m
+
+# Extensions loaded by every node (rendered into druid.extensions.loadList).
+extensions:
+  - druid-kubernetes-overlord-extensions
+  - druid-avro-extensions
+  - druid-s3-extensions
+  - druid-kafka-indexing-service
+  - druid-datasketches
+  - druid-kubernetes-extensions
+  - postgresql-metadata-storage
+
+# Deep storage. Works with AWS S3 or S3-compatible stores (Garage, MinIO, Ceph).
+deepStorage:
+  bucket: druid
+  baseKey: druid/segments-data
+  # S3-compatible stores often return a null ACL owner; keep disableAcl=true for them.
+  disableAcl: true
+  s3:
+    endpointUrl: http://garage.garage.svc.cluster.local:3900
+    signingRegion: garage
+    enablePathStyleAccess: true
+    protocol: http
+    # WARNING: credentials in plaintext. For real deployments use a Secret instead.
+    accessKey: "GK2e8295da0aa89eb42f531c44"
+    secretKey: "9d4ce5f41d3f249341cdfe914d377e74d76a99c8ab672b146cb572daab68ce7d"
+
+# Task / indexer logs (stored in the same S3 store as deep storage).
+indexerLogs:
+  bucket: druid
+  prefix: indexing-logs
+  # Must be true for S3-compatible stores that return a null ACL owner, otherwise
+  # task report/log pushes fail with a NullPointerException.
+  disableAcl: true
+
+# Metadata storage (PostgreSQL).
+metadata:
+  connectURI: "jdbc:postgresql://postgres.default.svc.cluster.local/druid"
+  user: druid
+  # WARNING: plaintext. For real deployments use a Secret instead.
+  password: "mySuperSecret@1234"
+
+# Processing buffers used by the MSQ task peons (controller/worker). Peons read
+# only the common properties, so these MUST be bounded here or the peons auto-size
+# huge buffers from detected direct memory and get OOM-killed.
+processing:
+  bufferSizeBytes: 25000000
+  numThreads: 2
+  numMergeBuffers: 2
+
+# Kubernetes task runner (middle-manager-less) settings.
+taskRunner:
+  capacity: 2
+  namespace: druid
+
+# Local host path backing the deepstorage volume (suitable for kind / single host).
+deepStorageHostPath: /tmp/druid/deepstorage
+
+# StorageClass for historical PVCs.
+storageClassName: standard
+
+# Extra env vars appended to every Druid pod (and inherited by task peons).
+extraEnv: []
+
+nodes:
+  brokers:
+    replicas: 1
+    heap:
+      xmx: 512m
+      xms: 512m
+  coordinators:
+    replicas: 1
+    heap:
+      xmx: 800m
+      xms: 800m
+  # Single historical tier (_default_tier). Scale the data tier via replicas.
+  historicals:
+    replicas: 2
+    heap:
+      xmx: 512m
+      xms: 512m
+    resources:
+      requests:
+        memory: "1500Mi"
+        cpu: "1"
+    storage: 5Gi
+    segmentCacheMaxSize: 1000000000
+    serverMaxSize: 1000000000
+  routers:
+    replicas: 1
+
+rbac:
+  create: true
+  serviceAccountName: default

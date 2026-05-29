@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "garage.name" . }}-config
+  labels:
+    {{- include "garage.labels" . | nindent 4 }}
+data:
+  garage.toml: |
+    metadata_dir = "/var/lib/garage/meta"
+    data_dir = "/var/lib/garage/data"
+    db_engine = "{{ .Values.garage.dbEngine }}"
+
+    replication_factor = {{ .Values.garage.replicationFactor }}
+
+    rpc_bind_addr = "[::]:{{ .Values.ports.rpc }}"
+    rpc_public_addr = "127.0.0.1:{{ .Values.ports.rpc }}"
+    rpc_secret = "{{ .Values.garage.rpcSecret }}"
+
+    [s3_api]
+    s3_region = "{{ .Values.garage.s3Region }}"
+    api_bind_addr = "[::]:{{ .Values.ports.s3Api }}"
+    root_domain = "{{ .Values.garage.s3RootDomain }}"
+
+    [s3_web]
+    bind_addr = "[::]:{{ .Values.ports.s3Web }}"
+    root_domain = "{{ .Values.garage.webRootDomain }}"
+    index = "{{ .Values.garage.webIndex }}"
+
+    [admin]
+    api_bind_addr = "[::]:{{ .Values.ports.admin }}"
+    admin_token = "{{ .Values.garage.adminToken }}"
+    metrics_token = "{{ .Values.garage.metricsToken }}"

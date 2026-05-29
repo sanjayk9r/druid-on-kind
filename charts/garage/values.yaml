@@ -1,0 +1,52 @@
+# Default values for the garage chart.
+# Garage is an S3-compatible object store; here it backs Druid's deep storage.
+# Install into the "garage" namespace, e.g.:
+#   helm install garage charts/garage -n garage --create-namespace
+
+# Name used for the StatefulSet, Service and ConfigMap. Druid connects to this
+# Service name (garage.<ns>.svc...), so keep it "garage" unless you also update
+# the Druid s3 endpoint URL.
+fullnameOverride: garage
+
+replicas: 1
+
+image:
+  repository: dxflrs/garage
+  tag: "v2.3.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+
+# Ports. These feed both the container/Service ports and the bind addresses
+# rendered into garage.toml, so they always stay in sync.
+ports:
+  s3Api: 3900
+  s3Web: 3902
+  admin: 3903
+  rpc: 3901
+
+# Per-volume storage for the StatefulSet volumeClaimTemplates.
+persistence:
+  meta:
+    size: 1Gi
+  data:
+    size: 5Gi
+  # Empty string uses the cluster default StorageClass.
+  storageClassName: ""
+
+# Optional pod resource requests/limits.
+resources: {}
+
+# Settings rendered into garage.toml.
+garage:
+  dbEngine: sqlite
+  replicationFactor: 1
+  s3Region: garage
+  s3RootDomain: ".s3.garage.localhost"
+  webRootDomain: ".web.garage.localhost"
+  webIndex: index.html
+  # WARNING: secrets in plaintext. For real deployments use a Secret instead.
+  rpcSecret: "ae3aa36ec67f8e87bf83326a1e6ea6b210bfe3781396991b0eee36959c15e6e2"
+  adminToken: "6ysJ2So4Yq6y/9o+LwLw30L71nFOA8cheymdxjmzr+E="
+  metricsToken: "lsLTbp/bfvyTtsPysBMxpIu2XlpmwzUNfJSetIfTS/I="

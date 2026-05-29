@@ -1,0 +1,6 @@
+apiVersion: v2
+name: druid
+description: A simple Helm chart for an Apache Druid cluster (ZooKeeper-less, middle-manager-less / Kubernetes task runner) managed by the druid-operator.
+type: application
+version: 0.1.0
+appVersion: "35.0.0"

@@ -1,0 +1,10 @@
+Garage "{{ include "garage.name" . }}" deployed to namespace "{{ .Release.Namespace }}".
+
+In-cluster S3 endpoint:
+  http://{{ include "garage.name" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.ports.s3Api }}
+  region: {{ .Values.garage.s3Region }}
+
+On first start the cluster layout is empty; initialize it before use, e.g.:
+  kubectl exec -n {{ .Release.Namespace }} {{ include "garage.name" . }}-0 -- /garage status
+  kubectl exec -n {{ .Release.Namespace }} {{ include "garage.name" . }}-0 -- /garage layout assign -z dc1 -c {{ .Values.persistence.data.size }} <node-id>
+  kubectl exec -n {{ .Release.Namespace }} {{ include "garage.name" . }}-0 -- /garage layout apply --version 1

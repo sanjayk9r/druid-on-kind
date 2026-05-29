@@ -1,0 +1,15 @@
+PostgreSQL "{{ include "postgresql.name" . }}" deployed to namespace "{{ .Release.Namespace }}".
+
+Connect from within the cluster:
+  host:     {{ include "postgresql.name" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  port:     {{ .Values.service.port }}
+  user:     {{ .Values.auth.username | default "postgres" }}
+{{- if .Values.auth.database }}
+  database: {{ .Values.auth.database }}
+{{- end }}
+
+{{- if .Values.persistence.enabled }}
+Persistence: PVC "{{ include "postgresql.name" . }}-data" ({{ .Values.persistence.size }}){{ if .Values.persistence.retain }}, retained on uninstall (set persistence.retain=false to delete it){{ else }}, deleted with the release on uninstall{{ end }}.
+{{- else }}
+NOTE: persistence is disabled (no PVC) — data is lost if the pod is recreated.
+{{- end }}

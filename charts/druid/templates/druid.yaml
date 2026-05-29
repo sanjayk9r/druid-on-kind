@@ -1,0 +1,265 @@
+apiVersion: druid.apache.org/v1alpha1
+kind: Druid
+metadata:
+  name: {{ .Values.clusterName }}
+  labels:
+    {{- include "druid.labels" . | nindent 4 }}
+spec:
+  image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+  startScript: /druid.sh
+  scalePvcSts: true
+  rollingDeploy: true
+  defaultProbes: false
+  podLabels:
+    {{- toYaml .Values.podLabels | nindent 4 }}
+  podAnnotations:
+    {{- toYaml .Values.podAnnotations | nindent 4 }}
+  securityContext:
+    {{- toYaml .Values.securityContext | nindent 4 }}
+  services:
+    - spec:
+        type: ClusterIP
+        clusterIP: None
+  commonConfigMountPath: "/opt/druid/conf/druid/cluster/_common"
+  jvm.options: |-
+    -server
+    -XX:MaxDirectMemorySize={{ .Values.jvm.maxDirectMemorySize }}
+    -Duser.timezone=UTC
+    -Dfile.encoding=UTF-8
+    -Dlog4j.debug
+    -Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager
+    -Djava.io.tmpdir=/druid/data
+  log4j.config: |-
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <Configuration status="WARN">
+        <Appenders>
+            <Console name="Console" target="SYSTEM_OUT">
+                <PatternLayout pattern="%d{ISO8601} %p [%t] %c - %m%n"/>
+            </Console>
+        </Appenders>
+        <Loggers>
+            <Root level="info">
+                <AppenderRef ref="Console"/>
+            </Root>
+        </Loggers>
+    </Configuration>
+  common.runtime.properties: |
+    #
+    # Zookeeper-less Druid Cluster
+    #
+    druid.zk.service.enabled=false
+    druid.discovery.type=k8s
+    druid.discovery.k8s.clusterIdentifier=druid-it
+    druid.serverview.type=http
+    druid.coordinator.loadqueuepeon.type=http
+    druid.indexer.runner.type=httpRemote
+
+    #
+    # Extensions
+    #
+    druid.extensions.loadList={{ .Values.extensions | toJson }}
+
+    # Deep Storage
+    druid.storage.type=s3
+    druid.storage.bucket={{ .Values.deepStorage.bucket }}
+    druid.storage.baseKey={{ .Values.deepStorage.baseKey }}
+    druid.storage.disableAcl={{ .Values.deepStorage.disableAcl }}
+
+    druid.s3.endpoint.url={{ .Values.deepStorage.s3.endpointUrl }}
+    druid.s3.endpoint.signingRegion={{ .Values.deepStorage.s3.signingRegion }}
+    druid.s3.enablePathStyleAccess={{ .Values.deepStorage.s3.enablePathStyleAccess }}
+    druid.s3.accessKey={{ .Values.deepStorage.s3.accessKey }}
+    druid.s3.secretKey={{ .Values.deepStorage.s3.secretKey }}
+    druid.s3.protocol={{ .Values.deepStorage.s3.protocol }}
+
+    # Metadata Store
+    druid.metadata.storage.type=postgresql
+    druid.metadata.storage.connector.connectURI={{ .Values.metadata.connectURI }}
+    druid.metadata.storage.connector.user={{ .Values.metadata.user }}
+    druid.metadata.storage.connector.password={{ .Values.metadata.password }}
+
+    #
+    # Service discovery
+    #
+    druid.selectors.indexing.serviceName=druid/overlord
+    druid.selectors.coordinator.serviceName=druid/coordinator
+
+    # Task / indexer logs
+    druid.indexer.logs.type=s3
+    druid.indexer.logs.s3Bucket={{ .Values.indexerLogs.bucket }}
+    druid.indexer.logs.s3Prefix={{ .Values.indexerLogs.prefix }}
+    druid.indexer.logs.disableAcl={{ .Values.indexerLogs.disableAcl }}
+    druid.lookup.enableLookupSyncOnStartup=false
+
+    #
+    # Task peon (MSQ controller/worker) processing memory. Peons read only these
+    # common properties, so bound the buffers here to avoid OOM-killed peons.
+    #
+    druid.processing.buffer.sizeBytes={{ int64 .Values.processing.bufferSizeBytes }}
+    druid.processing.numThreads={{ .Values.processing.numThreads }}
+    druid.processing.numMergeBuffers={{ .Values.processing.numMergeBuffers }}
+  volumeMounts:
+    - mountPath: /druid/data
+      name: data-volume
+    - mountPath: /druid/deepstorage
+      name: deepstorage-volume
+  volumes:
+    - name: data-volume
+      emptyDir: {}
+    - name: deepstorage-volume
+      hostPath:
+        path: {{ .Values.deepStorageHostPath }}
+        type: DirectoryOrCreate
+  env:
+    - name: POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    # Silence the AWS SDK for Java 1.x deprecation announcement. Set as an env var
+    # (not a -D jvm option) so it also reaches the generated task peon pods.
+    - name: AWS_JAVA_V1_DISABLE_DEPRECATION_ANNOUNCEMENT
+      value: "true"
+    {{- with .Values.extraEnv }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+
+  nodes:
+    brokers:
+      nodeType: "broker"
+      priorityClassName: system-cluster-critical
+      druid.port: 8088
+      services:
+        - spec:
+            type: ClusterIP
+            clusterIP: None
+      nodeConfigMountPath: "/opt/druid/conf/druid/cluster/query/broker"
+      replicas: {{ .Values.nodes.brokers.replicas }}
+      runtime.properties: |
+        druid.service=druid/broker
+        # HTTP server threads
+        druid.broker.http.numConnections=5
+        druid.server.http.numThreads=40
+        # Processing threads and buffers
+        druid.processing.buffer.sizeBytes={{ int64 .Values.processing.bufferSizeBytes }}
+        druid.sql.enable=true
+      extra.jvm.options: |-
+        -Xmx{{ .Values.nodes.brokers.heap.xmx }}
+        -Xms{{ .Values.nodes.brokers.heap.xms }}
+
+    coordinators:
+      nodeType: "coordinator"
+      druid.port: 8088
+      services:
+        - spec:
+            type: ClusterIP
+            clusterIP: None
+      nodeConfigMountPath: "/opt/druid/conf/druid/cluster/master/coordinator-overlord"
+      replicas: {{ .Values.nodes.coordinators.replicas }}
+      runtime.properties: |
+        druid.service=druid/coordinator
+        # HTTP server threads
+        druid.coordinator.startDelay=PT30S
+        druid.coordinator.period=PT30S
+        # Configure this coordinator to also run as Overlord
+        druid.coordinator.asOverlord.enabled=true
+        druid.coordinator.asOverlord.overlordService=druid/overlord
+        druid.indexer.queue.startDelay=PT30S
+        druid.indexer.runner.capacity={{ .Values.taskRunner.capacity }}
+        druid.indexer.runner.namespace={{ .Values.taskRunner.namespace }}
+        druid.indexer.runner.type=k8s
+        druid.indexer.task.encapsulatedTask=true
+        druid.indexer.storage.type=metadata
+      extra.jvm.options: |-
+        -Xmx{{ .Values.nodes.coordinators.heap.xmx }}
+        -Xms{{ .Values.nodes.coordinators.heap.xms }}
+
+    historicals:
+      nodeType: "historical"
+      druid.port: 8088
+      replicas: {{ .Values.nodes.historicals.replicas }}
+      resources:
+        requests:
+          {{- toYaml .Values.nodes.historicals.resources.requests | nindent 10 }}
+      services:
+        - spec:
+            type: ClusterIP
+            clusterIP: None
+      nodeConfigMountPath: "/opt/druid/conf/druid/cluster/data/historical"
+      livenessProbe:
+        failureThreshold: 10
+        httpGet:
+          path: /status/health
+          port: 8088
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 5
+      readinessProbe:
+        failureThreshold: 20
+        httpGet:
+          path: /druid/historical/v1/loadstatus
+          port: 8088
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        successThreshold: 1
+        timeoutSeconds: 5
+      startUpProbe:
+        failureThreshold: 20
+        httpGet:
+          path: /druid/historical/v1/loadstatus
+          port: 8088
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        successThreshold: 1
+        timeoutSeconds: 10
+      volumeMounts:
+      - mountPath: /druid/data/segments
+        name: historical-volume
+      volumeClaimTemplates:
+      - metadata:
+          name: historical-volume
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: {{ .Values.nodes.historicals.storage }}
+          storageClassName: {{ .Values.storageClassName }}
+      runtime.properties: |
+        druid.service=druid/historical
+        druid.server.tier=_default_tier
+        druid.server.priority=0
+        druid.processing.buffer.sizeBytes={{ int64 .Values.processing.bufferSizeBytes }}
+        druid.processing.numThreads={{ .Values.processing.numThreads }}
+        # Segment storage
+        druid.segmentCache.locations=[{"path":"/druid/data/segments","maxSize":{{ int64 .Values.nodes.historicals.segmentCacheMaxSize }} }]
+        druid.server.maxSize={{ int64 .Values.nodes.historicals.serverMaxSize }}
+      extra.jvm.options: |-
+        -Xmx{{ .Values.nodes.historicals.heap.xmx }}
+        -Xms{{ .Values.nodes.historicals.heap.xms }}
+
+    routers:
+      nodeType: "router"
+      druid.port: 8088
+      services:
+        - spec:
+            type: ClusterIP
+            clusterIP: None
+      nodeConfigMountPath: "/opt/druid/conf/druid/cluster/query/router"
+      replicas: {{ .Values.nodes.routers.replicas }}
+      runtime.properties: |
+        druid.service=druid/router
+        # HTTP proxy
+        druid.router.http.numConnections=50
+        druid.router.http.readTimeout=PT5M
+        druid.router.http.numMaxThreads=100
+        druid.server.http.numThreads=100
+        # Service discovery
+        druid.router.defaultBrokerServiceName=druid/broker
+        druid.router.coordinatorServiceName=druid/coordinator
+        # Management proxy to coordinator / overlord: required for unified web console.
+        druid.router.managementProxy.enabled=true

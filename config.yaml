@@ -1,0 +1,27 @@
+# kind cluster: 1 control-plane + 2 workers.
+#
+# Create with:
+#   kind create cluster --config config.yaml
+#
+# (kind-registry.sh uses the same topology and additionally wires up a local
+# image registry.)
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: mykindk8s
+nodes:
+  - role: control-plane
+    # Make ./data available inside the cluster (used by hostPath volumes).
+    extraMounts:
+      - hostPath: ./data
+        containerPath: /mnt/data
+  - role: worker
+  - role: worker
+
+# Enable the containerd registry config dir. The per-host registry settings
+# (insecure http mirror) are written as hosts.toml files by kind-registry.sh.
+# containerd 2.x (these nodes run 2.2.0) ignores inline registry.mirrors/configs,
+# so the hosts.toml style is required.
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"

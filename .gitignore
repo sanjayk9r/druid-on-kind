@@ -1,0 +1,25 @@
+# IDE / editor
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Build scratch (e.g. cloned druid-operator source for local arm64 builds)
+.build/
+
+# Helm
+*.tgz
+charts/**/charts/
+
+# Local registry TLS material (if generated)
+certs/
+
+# Kubeconfigs / secrets dropped locally
+kubeconfig
+*.kubeconfig
+
+data/
