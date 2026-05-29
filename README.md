@@ -1,4 +1,4 @@
-# local-k8s-kind — Apache Druid sandbox on kind
+# Apache Druid sandbox on kind
 
 A local, end-to-end Apache Druid environment that runs on a [kind](https://kind.sigs.k8s.io)
 cluster. Druid runs ZooKeeper-less and middle-manager-less (ingestion tasks run as
