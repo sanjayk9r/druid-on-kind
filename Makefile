@@ -54,7 +54,7 @@ cluster: ## Create the kind cluster (1 control-plane + 2 workers) and local regi
 	@if kind get clusters 2>/dev/null | grep -qx $(CLUSTER_NAME); then \
 	  echo "cluster '$(CLUSTER_NAME)' already exists, skipping"; \
 	else \
-	  mkdir data && ./kind-registry.sh; \
+	  mkdir -p data && ./kind-registry.sh; \
 	fi
 
 .PHONY: operator
