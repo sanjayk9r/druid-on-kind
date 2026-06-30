@@ -1,0 +1,17 @@
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kafka.serviceName" . }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app: {{ include "kafka.name" . }}
+  ports:
+    - name: kafka
+      protocol: TCP
+      port: {{ .Values.service.port }}
+      targetPort: kafka
+{{- end }}

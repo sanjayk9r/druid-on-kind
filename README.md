@@ -13,6 +13,7 @@ Kubernetes pods via the K8s task runner). Everything is wired together by a sing
 | druid-operator | `charts/druid-operator` (public `datainfrahq/druid-operator` image) | `druid-operator-system` | Ships the `Druid` CRD and reconciles the CR into pods |
 | garage | `charts/garage` | `garage` | S3-compatible object store — Druid deep storage + task logs |
 | postgresql | `charts/postgresql` | `default` | Druid metadata store |
+| kafka | `charts/kafka` | `kafka` | Single-broker KRaft Kafka for streaming ingestion |
 | druid | `charts/druid` | `druid` | The Druid cluster (`Druid` custom resource) |
 
 See [`charts/README.md`](charts/README.md) for chart-level detail and how the
@@ -26,13 +27,14 @@ pieces are wired (S3 endpoint, JDBC URI, credentials).
 ## Quick start
 
 ```sh
-make up           # kind cluster (+registry) -> operator -> garage -> postgres -> druid
+make up           # kind cluster (+registry) -> operator -> garage -> postgres -> kafka -> druid
 make garage-init  # initialize garage: layout + druid bucket + access key (run once, before ingesting)
 make status       # show pods across all namespaces
 ```
 
 Then submit an MSQ ingestion against the Druid router/broker (port-forward or via
-the web console).
+the web console), or use Kafka-based ingestion with bootstrap servers
+`kafka.kafka.svc.cluster.local:9092`.
 
 Tear down:
 
@@ -42,7 +44,7 @@ make clean        # delete the cluster and remove the local registry container
 ```
 
 Run `make help` to list all targets. Individual steps are also targets:
-`make cluster | operator | garage | postgres | druid`.
+`make cluster | operator | garage | postgres | kafka | druid`.
 
 ## Repo layout
 
@@ -57,6 +59,7 @@ Run `make help` to list all targets. Individual steps are also targets:
     ├── druid-operator/ # the operator (vendored chart, public image)
     ├── garage/         # S3 deep storage
     ├── postgresql/     # metadata store
+    ├── kafka/          # KRaft Kafka broker (streaming ingestion)
     └── druid/          # the Druid cluster CR
 ```
 

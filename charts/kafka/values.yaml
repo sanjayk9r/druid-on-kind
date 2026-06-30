@@ -1,0 +1,35 @@
+# Kafka minimal deployment configuration (single-broker KRaft mode).
+
+image:
+  repository: apache/kafka
+  tag: "3.9.0"
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+resources:
+  requests:
+    cpu: "200m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+kafka:
+  nodeId: "1"
+  processRoles: broker,controller
+  listeners: PLAINTEXT://:9092,CONTROLLER://:9093
+  controllerListenerNames: CONTROLLER
+  listenerSecurityProtocolMap: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+  controllerQuorumVoters: "1@localhost:9093"
+  offsetsTopicReplicationFactor: "1"
+  transactionStateLogReplicationFactor: "1"
+  transactionStateLogMinIsr: "1"
+  groupInitialRebalanceDelayMs: "0"
+  numPartitions: "3"
+
+service:
+  enabled: true
+  name: ""
+  type: ClusterIP
+  port: 9092

@@ -1,7 +1,7 @@
 # End-to-end local Apache Druid sandbox on kind.
 #
 # Bring-up order:
-#   kind cluster (+ local registry) -> druid-operator -> garage -> postgres -> druid
+#   kind cluster (+ local registry) -> druid-operator -> garage -> postgres -> kafka -> druid
 #
 # Quick start:
 #   make up          # full end-to-end bring-up
@@ -9,7 +9,7 @@
 #   make status      # show pods across the sandbox namespaces
 #   make down        # delete the kind cluster
 #
-# Individual steps: make cluster | operator | garage | postgres | druid
+# Individual steps: make cluster | operator | garage | postgres | kafka | druid
 
 SHELL := /bin/bash
 
@@ -18,6 +18,7 @@ OPERATOR_NS  ?= druid-operator-system
 GARAGE_NS    ?= garage
 DRUID_NS     ?= druid
 POSTGRES_NS  ?= default
+KAFKA_NS     ?= kafka
 DRUID_DB     ?= druid
 
 # Must match charts/druid/values.yaml deepStorage.s3.{accessKey,secretKey}.
@@ -42,9 +43,9 @@ help: ## Show this help
 	  awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-13s\033[0m %s\n", $$1, $$2}'
 
 .PHONY: up
-up: cluster operator garage postgres druid ## Full end-to-end bring-up
+up: cluster operator garage postgres kafka druid ## Full end-to-end bring-up
 	@echo ""
-	@echo "Deployed: operator + garage + postgres + druid."
+	@echo "Deployed: operator + garage + postgres + kafka + druid."
 	@echo "Next:"
 	@echo "  make garage-init   # required before ingestion (creates layout/bucket/key)"
 	@echo "  make status        # watch pods come up"
@@ -92,6 +93,11 @@ postgres: ## Deploy postgres (metadata store) and create the druid database
 	helm upgrade --install postgres charts/postgresql -n $(POSTGRES_NS) --set auth.database=$(DRUID_DB)
 	kubectl -n $(POSTGRES_NS) rollout status deploy/postgres --timeout=180s
 
+.PHONY: kafka
+kafka: ## Deploy kafka (KRaft standalone broker for ingestion)
+	helm upgrade --install kafka charts/kafka -n $(KAFKA_NS) --create-namespace
+	kubectl -n $(KAFKA_NS) rollout status deploy/kafka --timeout=180s
+
 .PHONY: druid
 druid: ## Deploy the Druid cluster CR (reconciled by the operator)
 	helm upgrade --install druid charts/druid -n $(DRUID_NS) --create-namespace
@@ -113,6 +119,7 @@ status: ## Show pods across the sandbox namespaces
 	-kubectl get pods -n $(OPERATOR_NS)
 	-kubectl get pods -n $(GARAGE_NS)
 	-kubectl get pods -n $(POSTGRES_NS) -l app=postgres
+	-kubectl get pods -n $(KAFKA_NS)
 	-kubectl get pods -n $(DRUID_NS)
 
 .PHONY: down

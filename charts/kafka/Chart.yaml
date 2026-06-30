@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kafka
+description: A minimal single-broker Kafka deployment (KRaft mode) for Druid ingestion.
+type: application
+version: 0.1.0
+appVersion: "3.9.0"
