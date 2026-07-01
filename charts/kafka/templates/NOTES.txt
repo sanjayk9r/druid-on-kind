@@ -1,0 +1,10 @@
+Kafka "{{ include "kafka.name" . }}" deployed to namespace "{{ .Release.Namespace }}".
+
+Bootstrap servers (from within the cluster):
+  {{ include "kafka.serviceName" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+
+{{- if .Values.persistence.enabled }}
+Persistence: PVC "{{ include "kafka.name" . }}-data" ({{ .Values.persistence.size }}){{ if .Values.persistence.retain }}, retained on uninstall (set persistence.retain=false to delete it){{ else }}, deleted with the release on uninstall{{ end }}.
+{{- else }}
+NOTE: persistence is disabled (no PVC) — topic data is lost if the pod is recreated.
+{{- end }}
