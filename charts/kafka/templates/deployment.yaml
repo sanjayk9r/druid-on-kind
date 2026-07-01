@@ -51,9 +51,14 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- if .Values.persistence.enabled }}
           volumeMounts:
             - name: data
               mountPath: /var/lib/kafka
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
       volumes:
         - name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: {{ include "kafka.name" . }}-data
+      {{- end }}

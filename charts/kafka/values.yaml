@@ -1,5 +1,10 @@
 # Kafka minimal deployment configuration (single-broker KRaft mode).
 
+# Name used for the Deployment and Service. Other charts reach Kafka via this
+# Service name (kafka.<ns>.svc...), so keep it "kafka" unless you also update
+# those references.
+fullnameOverride: kafka
+
 image:
   repository: apache/kafka
   tag: "3.9.0"
@@ -14,6 +19,17 @@ resources:
   limits:
     cpu: "500m"
     memory: "1Gi"
+
+persistence:
+  # Create and mount a PersistentVolumeClaim for the broker's log data.
+  enabled: true
+  # When true, the PVC is kept on `helm uninstall` (helm.sh/resource-policy: keep)
+  # so topic data survives a reinstall. Set to false to let the PVC be deleted
+  # with the release: helm upgrade ... --set persistence.retain=false (then uninstall).
+  retain: false
+  size: 5Gi
+  storageClassName: standard
+  accessMode: ReadWriteOnce
 
 kafka:
   nodeId: "1"

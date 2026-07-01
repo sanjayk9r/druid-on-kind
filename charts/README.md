@@ -1,6 +1,6 @@
 # Druid-on-kind Helm charts
 
-Three small charts that, together with the **druid-operator**, stand up an Apache
+Small charts that, together with the **druid-operator**, stand up an Apache
 Druid cluster on a local kind cluster (ZooKeeper-less, middle-manager-less /
 Kubernetes task runner topology).
 
@@ -13,6 +13,7 @@ document the individual pieces.
 | [`druid-operator`](./druid-operator) | Reconciles the `Druid` CR into pods; ships the `Druid` CRD (public `datainfrahq/druid-operator` image) | `druid-operator-system` | n/a |
 | [`garage`](./garage) | S3-compatible object store — Druid **deep storage** + task logs | `garage` | `garage.garage.svc.cluster.local:3900` |
 | [`postgresql`](./postgresql) | Druid **metadata store** | `default` | `postgres.default.svc.cluster.local:5432` |
+| [`kafka`](./kafka) | Single-broker KRaft Kafka for streaming ingestion | `kafka` | `kafka.kafka.svc.cluster.local:9092` |
 | [`druid`](./druid) | The Druid cluster (a `Druid` custom resource) | `druid` | router/broker via the operator |
 
 ```
@@ -40,13 +41,13 @@ document the individual pieces.
 The repo-root `Makefile` runs the whole sequence:
 
 ```sh
-make up           # kind cluster (+registry) -> operator -> garage -> postgres -> druid
+make up           # kind cluster (+registry) -> operator -> garage -> postgres -> kafka -> druid
 make garage-init  # initialize garage (layout + druid bucket + access key) before ingesting
 make status       # show pods across all namespaces
 make down         # delete the kind cluster
 ```
 
-Individual steps are also targets: `make cluster | operator | garage | postgres | druid`.
+Individual steps are also targets: `make cluster | operator | garage | postgres | kafka | druid`.
 
 ## Install order (manual equivalent)
 
@@ -65,7 +66,10 @@ helm install garage charts/garage -n garage --create-namespace
 helm install postgres charts/postgresql -n default \
   --set auth.database=druid
 
-# 3. The Druid cluster (operator reconciles it)
+# 3. Streaming ingestion source
+helm install kafka charts/kafka -n kafka --create-namespace
+
+# 4. The Druid cluster (operator reconciles it)
 helm install druid charts/druid -n druid --create-namespace
 ```
 
@@ -112,6 +116,7 @@ These are external to Helm (they create state inside garage / Postgres):
 
 ```sh
 helm uninstall druid -n druid
+helm uninstall kafka -n kafka
 helm uninstall postgres -n default
 helm uninstall garage -n garage
 ```
@@ -120,6 +125,9 @@ PVC retention differs per chart:
 
 - **postgresql** keeps its PVC by default (`persistence.retain=true`). To let it
   be deleted with the release, set `persistence.retain=false` before uninstalling.
+- **kafka** deletes its PVC with the release by default (`persistence.retain=false`,
+  since it's just an ingestion buffer). Set `persistence.retain=true` before
+  installing to keep topic data across a reinstall.
 - **garage** PVCs come from the StatefulSet `volumeClaimTemplates`; Helm does not
   delete those on uninstall — remove them manually if you want a clean slate
   (`kubectl delete pvc -n garage -l app=garage`).
